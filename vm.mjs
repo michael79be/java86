@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises';
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import { readFileSync } from 'fs';
 import { V86 } from 'v86';
 import { resolve } from 'path';
-import { createOrLoadHddImage, mountFatPartition } from './image.mjs';
+import { createOrLoadHddImage, mountFatPartition, copySources, copyBuildOutputs } from './image.mjs';
 
 export class VM {
     constructor(config = {}) {
@@ -24,34 +24,6 @@ export class VM {
             `BUFFERS=${this.configSys.buffers}`,
             `STACKS=${this.configSys.stacks}`
         ].join('\r\n');
-    }
-
-    async copyReleaseFiles(hddBuffer) {
-        const releaseDir = resolve(this.projectDir, 'release');
-        const files = existsSync(releaseDir)
-            ? readdirSync(releaseDir, { withFileTypes: true })
-                .filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.com'))
-                .map(entry => ({
-                    name: entry.name,
-                    path: resolve(releaseDir, entry.name)
-                }))
-            : [];
-        const classesJarPath = resolve(this.projectDir, 'build', 'CLASSES.JAR');
-        if (existsSync(classesJarPath)) {
-            files.push({ name: 'CLASSES.JAR', path: classesJarPath });
-        }
-        if (files.length === 0) return;
-
-        console.log('Copying build outputs to C:\\...');
-        const hddFs = await mountFatPartition(hddBuffer, 63);
-        for (const file of files) {
-            const content = readFileSync(file.path);
-            const dosPath = `/${file.name.toUpperCase()}`;
-            await new Promise((resolve, reject) =>
-                hddFs.writeFile(dosPath, content, (error) => (error ? reject(error) : resolve()))
-            );
-            console.log(`  ${file.name}`);
-        }
     }
 
     async initialize() {
@@ -82,7 +54,9 @@ export class VM {
 
         console.log('Loading HDD image (may take up to 2 minutes on first run)...');
         const hddBuffer = await createOrLoadHddImage(this.projectDir);
-        await this.copyReleaseFiles(hddBuffer);
+        const hddFs = await mountFatPartition(hddBuffer, 63);
+        await copySources(hddFs, this.projectDir);
+        await copyBuildOutputs(hddFs, this.projectDir);
 
         const toArrayBuffer = (buf) => {
             if (buf instanceof ArrayBuffer) return buf;

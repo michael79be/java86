@@ -268,4 +268,33 @@ async function copyTools(fs, projectDir) {
     }
 }
 
-export { mountFatPartition };
+async function copyBuildOutputs(fs, projectDir) {
+    const releaseDir = resolve(projectDir, 'release');
+    const buildDir = resolve(projectDir, 'build');
+    const files = [];
+
+    if (existsSync(releaseDir)) {
+        for (const entry of readdirSync(releaseDir, { withFileTypes: true })) {
+            if (entry.isFile() && entry.name.toLowerCase().endsWith('.com')) {
+                files.push({ name: entry.name, path: resolve(releaseDir, entry.name) });
+            }
+        }
+    }
+    if (existsSync(buildDir)) {
+        for (const entry of readdirSync(buildDir, { withFileTypes: true })) {
+            if (entry.isFile() && entry.name.toUpperCase().endsWith('.JAR')) {
+                files.push({ name: entry.name, path: resolve(buildDir, entry.name) });
+            }
+        }
+    }
+    if (files.length === 0) return;
+
+    console.log('Copying build outputs to C:\\...');
+    for (const file of files) {
+        const content = readFileSync(file.path);
+        await writeFileToFat(fs, `/${file.name.toUpperCase()}`, content);
+        console.log(`  ${file.name}`);
+    }
+}
+
+export { mountFatPartition, copySources, copyBuildOutputs };

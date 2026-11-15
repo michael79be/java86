@@ -29,11 +29,12 @@ Affichage interactif FreeDOS avec redirection série. Les commandes DOS fonction
 
 ## Scripts
 
-- `npm run start` — Lance FreeDOS avec TTY série et copie les `.COM` de `release/` ainsi que `build/CLASSES.JAR` à la racine du disque C:
-- `npm run build -- src/java.c` — Compile les sources Java avec Janino, crée `build/CLASSES.JAR` sans compression, puis compile uniquement le fichier C indiqué
+- `npm run start` — Lance FreeDOS avec TTY série et copie les `.COM` de `release/` ainsi que les `.JAR` de `build/` à la racine du disque C:
+- `npm run emulator` — Sert FreeDOS dans le navigateur (écran VGA + clavier) sur http://localhost:8086/
+- `npm run build -- src/java.c` — Compile les sources Java avec Janino, crée un JAR sans compression par package (ex. `build/DEMO.JAR`, `build/PLATFORM.JAR`), puis compile uniquement le fichier C indiqué
 - `npm run install:dev` — Télécharge dépendances
 
-Dans FreeDOS : `java -classpath CLASSES.JAR demo.Hello`. Les JAR restent ouverts pendant l'exécution ; le cache de dix entrées utilise le CRC16 du nom et ne détecte pas les collisions.
+Dans FreeDOS : `java -classpath DEMO.JAR;PLATFORM.JAR demo.Hello`. Les JAR restent ouverts pendant l'exécution ; le cache de dix entrées utilise le CRC16 du nom et ne détecte pas les collisions.
 
 ## État
 

@@ -59,13 +59,27 @@ class BuildVM extends VM {
             throw new Error(`No Java class files found in ${buildDir}`);
         }
 
-        await this.createClassesJar(buildDir, classFiles);
+        const packages = new Map();
+        for (const file of classFiles) {
+            const parts = file.split(sep);
+            if (parts.length < 2) {
+                throw new Error(`Class without package is not supported: ${file}`);
+            }
+            const packageName = parts[0];
+            if (!packages.has(packageName)) packages.set(packageName, []);
+            packages.get(packageName).push(file);
+        }
+
+        for (const [packageName, files] of packages) {
+            await this.createPackageJar(buildDir, packageName, files);
+        }
     }
 
-    async createClassesJar(buildDir, classFiles) {
+    async createPackageJar(buildDir, packageName, classFiles) {
         const SevenZipFactory = (await import('7z-wasm')).default;
         const sevenZip = await SevenZipFactory({ noFSInit: false });
         const archiveRoot = '/classes';
+        const jarName = `${packageName.toUpperCase()}.JAR`;
         sevenZip.FS.mkdir(archiveRoot);
 
         const archiveFiles = classFiles.map((file) => file.split(sep).join('/'));
@@ -91,10 +105,10 @@ class BuildVM extends VM {
         }
 
         sevenZip.FS.chdir(archiveRoot);
-        const jarPath = resolve(buildDir, 'CLASSES.JAR');
+        const jarPath = resolve(buildDir, jarName);
         console.log(`[BUILD] Creating uncompressed ${jarPath}...`);
-        sevenZip.callMain(['a', '-tzip', '/CLASSES.JAR', ...archiveFiles, '-mx=0']);
-        writeFileSync(jarPath, Buffer.from(sevenZip.FS.readFile('/CLASSES.JAR')));
+        sevenZip.callMain(['a', '-tzip', `/${jarName}`, ...archiveFiles, '-mx=0']);
+        writeFileSync(jarPath, Buffer.from(sevenZip.FS.readFile(`/${jarName}`)));
     }
 
     async setupSourceFiles() {
@@ -207,6 +221,26 @@ class BuildVM extends VM {
         });
     }
 
+    async waitForCompiledFile() {
+        const { mountFatPartition } = await import('./image.mjs');
+        const comName = basename(this.compileFile)
+            .replace(extname(this.compileFile), '.com').toUpperCase();
+        const deadline = Date.now() + 30000;
+        let previousSize = -1;
+
+        while (Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            const hddFs = await mountFatPartition(this.hddBuffer, 63);
+            const size = await new Promise(resolve =>
+                hddFs.readFile(`/SRC/${comName}`, (error, data) =>
+                    resolve(error ? -1 : data.length))
+            );
+            if (size > 0 && size === previousSize) return true;
+            previousSize = size;
+        }
+        return false;
+    }
+
     async retrieveCompiledFiles() {
         console.log('Retrieving compiled files...');
 
@@ -303,7 +337,6 @@ async function main() {
         await builder.initialize();
 
         let currentLine = '';
-        let dirOutputComplete = false;
 
         builder.emulator.add_listener('serial0-output-byte', (byte) => {
             const char = String.fromCharCode(byte);
@@ -314,27 +347,13 @@ async function main() {
                 if (currentLine.trim()) {
                     builder.buildLog.push(currentLine.trim());
                 }
-                if (currentLine.includes('C:\\SRC>') && builder.buildLog.some(l => l.includes('.COM'))) {
-                    dirOutputComplete = true;
-                }
                 currentLine = '';
             }
         });
 
-        await new Promise(resolve => {
-            const check = setInterval(() => {
-                if (dirOutputComplete) {
-                    clearInterval(check);
-                    resolve();
-                }
-            }, 100);
-            setTimeout(() => {
-                clearInterval(check);
-                resolve();
-            }, 30000);
-        });
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (!await builder.waitForCompiledFile()) {
+            console.error('\n[BUILD] Timed out waiting for the compiled file');
+        }
 
         const compiled = await builder.retrieveCompiledFiles();
 

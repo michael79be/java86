@@ -19,7 +19,7 @@ This downloads and prepares:
 npm run start
 ```
 
-This boots FreeDOS with gcc-ia16 packages on the hard drive and copies `release/*.COM` plus `build/CLASSES.JAR` to the root of C: when present.
+This boots FreeDOS with gcc-ia16 packages on the hard drive and copies `release/*.COM` plus `build/*.JAR` to the root of C: when present.
 
 First boot requires setup:
 ```dos
@@ -36,7 +36,7 @@ npm run build -- src/hello.c
 ```
 
 Compiles:
-- Java classes (`.java` → `.class`) using Janino and packages them in an uncompressed `build/CLASSES.JAR`
+- Java classes (`.java` → `.class`) using Janino, packaged in uncompressed per-package JARs (e.g. `build/DEMO.JAR`, `build/PLATFORM.JAR`)
 - The selected C program (`.c` → `.COM`) using gcc-ia16 in the FreeDOS VM
 
 ## Architecture
