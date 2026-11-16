@@ -6,6 +6,7 @@
     "scripts": {
         "init": "node init.mjs",
         "build": "node build.mjs",
+        "make": "node make.mjs",
         "start": "node start.mjs",
         "emulator": "node emulator.mjs",
         "test": "node test.mjs"

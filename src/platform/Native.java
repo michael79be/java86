@@ -11,11 +11,11 @@ public class Native {
 
     public static native int readByte(int address);
 
-    public static native void readBytes(int address, byte[] buffer);
+    public static native void readBytes(int address, byte[] buffer, int windowWidth, int frameWidth, int offset);
 
     public static native void writeByte(int address, int value);
 
-    public static native void writeBytes(int address, byte[] buffer);
+    public static native void writeBytes(int address, byte[] buffer, int windowWidth, int frameWidth, int offset, int ignoreColor);
 
     public static native void writeBytes(int address, int value, int count);
 

@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import { readFileSync } from 'fs';
 import { V86 } from 'v86';
 import { resolve } from 'path';
-import { createOrLoadHddImage, mountFatPartition, copySources, copyBuildOutputs } from './image.mjs';
+import { createOrLoadHddImage, mountFatPartition, copySources, copyBuildOutputs, copyData } from './image.mjs';
 
 export class VM {
     constructor(config = {}) {
@@ -57,6 +57,7 @@ export class VM {
         const hddFs = await mountFatPartition(hddBuffer, 63);
         await copySources(hddFs, this.projectDir);
         await copyBuildOutputs(hddFs, this.projectDir);
+        await copyData(hddFs, this.projectDir);
 
         const toArrayBuffer = (buf) => {
             if (buf instanceof ArrayBuffer) return buf;

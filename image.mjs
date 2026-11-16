@@ -135,6 +135,11 @@ async function populateHdd(fs, projectDir) {
     await copySources(fs, projectDir);
     await copyDevel(fs, projectDir);
     await copyTools(fs, projectDir);
+    await copyData(fs, projectDir);
+
+    await copySources(fs, projectDir);
+    await copyDevel(fs, projectDir);
+    await copyTools(fs, projectDir);
 }
 
 async function copySources(fs, projectDir) {
@@ -297,4 +302,41 @@ async function copyBuildOutputs(fs, projectDir) {
     }
 }
 
-export { mountFatPartition, copySources, copyBuildOutputs };
+async function copyData(fs, projectDir) {
+    const dataDir = resolve(projectDir, 'data');
+    if (!existsSync(dataDir)) return;
+
+    console.log('Copying data folder to C:\\...');
+
+    const allDirs = new Set();
+    const allFiles = [];
+
+    const walkDir = (dir, prefix = '') => {
+        try {
+            const entries = readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = resolve(dir, entry.name);
+                const dosPath = prefix === ''
+                    ? `/${entry.name}`.toUpperCase()
+                    : `${prefix}/${entry.name}`.toUpperCase();
+                if (entry.isDirectory()) {
+                    allDirs.add(dosPath);
+                    walkDir(fullPath, dosPath);
+                } else if (entry.isFile()) {
+                    allFiles.push({ src: fullPath, dst: dosPath });
+                }
+            }
+        } catch (e) {}
+    };
+
+    walkDir(dataDir);
+
+    for (const dir of allDirs) {
+        await mkdirOnFat(fs, dir);
+    }
+    for (const file of allFiles) {
+        const content = readFileSync(file.src);
+        await writeFileToFat(fs, file.dst, content);
+    }
+}
+export { mountFatPartition, copySources, copyBuildOutputs, copyData };

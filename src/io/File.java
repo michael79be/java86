@@ -20,7 +20,7 @@ public class File {
         return Native.interrupt(0x21, regs);
     }
 
-    static int open(String path, int function) {
+    public static int open(String path, int function) {
         int[] regs = pathCall(path, function, 0);
         if ((regs[8] & 1) != 0) {
             return -1;
@@ -28,14 +28,14 @@ public class File {
         return regs[0];
     }
 
-    static void close(int handle) {
+    public static void close(int handle) {
         int[] regs = new int[9];
         regs[0] = 0x3e00;
         regs[1] = handle;
         Native.interrupt(0x21, regs);
     }
 
-    static int seek(int handle, int origin) {
+    public static int seek(int handle, int origin) {
         int[] regs = new int[9];
         regs[0] = 0x4200 + origin;
         regs[1] = handle;

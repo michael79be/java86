@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { VM } from './vm.mjs';
-import { execSync } from 'child_process';
-import { resolve, extname, basename, delimiter, relative, sep } from 'path';
-import { writeFileSync, mkdirSync, readdirSync, readFileSync } from 'fs';
+import { resolve, extname, basename } from 'path';
+import { writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { existsSync } from 'fs';
+import { Make } from './make.mjs';
 
 class BuildVM extends VM {
     constructor(config = {}) {
@@ -17,99 +17,10 @@ class BuildVM extends VM {
     }
 
     async compileJavaSources() {
-        const srcDir = resolve(this.projectDir, 'src');
-        const collectFiles = (directory, extension) =>
-            readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-                const file = resolve(directory, entry.name);
-                if (entry.isDirectory()) return collectFiles(file, extension);
-                return entry.isFile() && extname(entry.name).toLowerCase() === extension ? [file] : [];
-            });
-        const javaFiles = collectFiles(srcDir, '.java');
-
-        if (javaFiles.length === 0) return;
-
-        const janinoDir = resolve(this.projectDir, 'bin', 'janino');
-        const jars = [
-            resolve(janinoDir, 'janino.jar'),
-            resolve(janinoDir, 'commons-compiler.jar')
-        ];
-        if (!jars.every(existsSync)) {
-            throw new Error(`Janino JARs not found in ${janinoDir}`);
-        }
-
-        const buildDir = resolve(this.projectDir, 'build');
-        mkdirSync(buildDir, { recursive: true });
-
-        const quote = (value) => `'${value.replace(/'/g, "'\\''")}'`;
-        const command = [
-            'java',
-            '-cp',
-            quote(jars.join(delimiter)),
-            'org.codehaus.commons.compiler.samples.CompilerDemo',
-            '-d',
-            quote(buildDir),
-            ...javaFiles.map(quote)
-        ].join(' ');
-
-        console.log(`[BUILD] Compiling ${javaFiles.length} Java file(s) with Janino...`);
-        execSync(command, { cwd: this.projectDir, stdio: 'inherit' });
-
-        const classFiles = collectFiles(buildDir, '.class').map((file) => relative(buildDir, file));
-        if (classFiles.length === 0) {
-            throw new Error(`No Java class files found in ${buildDir}`);
-        }
-
-        const packages = new Map();
-        for (const file of classFiles) {
-            const parts = file.split(sep);
-            if (parts.length < 2) {
-                throw new Error(`Class without package is not supported: ${file}`);
-            }
-            const packageName = parts[0];
-            if (!packages.has(packageName)) packages.set(packageName, []);
-            packages.get(packageName).push(file);
-        }
-
-        for (const [packageName, files] of packages) {
-            await this.createPackageJar(buildDir, packageName, files);
-        }
+        const make = new Make(this.projectDir);
+        await make.compileJavaSources();
     }
 
-    async createPackageJar(buildDir, packageName, classFiles) {
-        const SevenZipFactory = (await import('7z-wasm')).default;
-        const sevenZip = await SevenZipFactory({ noFSInit: false });
-        const archiveRoot = '/classes';
-        const jarName = `${packageName.toUpperCase()}.JAR`;
-        sevenZip.FS.mkdir(archiveRoot);
-
-        const archiveFiles = classFiles.map((file) => file.split(sep).join('/'));
-        const directories = new Set();
-        for (const file of archiveFiles) {
-            const parts = file.split('/');
-            let directory = archiveRoot;
-            for (const part of parts.slice(0, -1)) {
-                directory += `/${part}`;
-                directories.add(directory);
-            }
-        }
-
-        for (const directory of [...directories].sort((left, right) => left.length - right.length)) {
-            sevenZip.FS.mkdir(directory);
-        }
-        for (let index = 0; index < archiveFiles.length; index++) {
-            const file = archiveFiles[index];
-            sevenZip.FS.writeFile(
-                `${archiveRoot}/${file}`,
-                readFileSync(resolve(buildDir, classFiles[index]))
-            );
-        }
-
-        sevenZip.FS.chdir(archiveRoot);
-        const jarPath = resolve(buildDir, jarName);
-        console.log(`[BUILD] Creating uncompressed ${jarPath}...`);
-        sevenZip.callMain(['a', '-tzip', `/${jarName}`, ...archiveFiles, '-mx=0']);
-        writeFileSync(jarPath, Buffer.from(sevenZip.FS.readFile(`/${jarName}`)));
-    }
 
     async setupSourceFiles() {
         const { mountFatPartition } = await import('./image.mjs');

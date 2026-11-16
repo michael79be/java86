@@ -3,7 +3,8 @@
 import http from 'node:http';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { createOrLoadHddImage, mountFatPartition, copySources, copyBuildOutputs } from './image.mjs';
+import { createOrLoadHddImage, mountFatPartition, copySources, copyBuildOutputs, copyData } from './image.mjs';
+import { Make } from './make.mjs';
 
 class EmulatorServer {
     constructor(config = {}) {
@@ -46,8 +47,11 @@ class EmulatorServer {
         console.log('Preparing HDD image...');
         const hddBuffer = await createOrLoadHddImage(this.projectDir);
         const hddFs = await mountFatPartition(hddBuffer, 63);
+        const make = new Make(this.projectDir);
+        await make.compileJavaSources();
         await copySources(hddFs, this.projectDir);
         await copyBuildOutputs(hddFs, this.projectDir);
+        await copyData(hddFs, this.projectDir);
         return hddBuffer;
     }
 

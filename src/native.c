@@ -104,30 +104,47 @@ int native_get_bytes(Frame *frame, uint32_t reference) {
     return frame_push(frame, ref);
 }
 
-int native_read_bytes(Frame *frame, uint32_t address, uint32_t reference) {
+int native_read_bytes(Frame *frame, uint32_t address, uint32_t reference, uint32_t windowWidth, uint32_t frameWidth, uint32_t offset) {
     HeapArray *array = array_get(process_arrays(frame->processes), reference);
-    uint16_t i;
-
     if (NULL == array || 1 != array->element_size) {
         sys_error("Invalid byte array reference\r\n");
         return 0;
     }
-    for (i = 0; i < array->length; i++) {
-        array_write(array, i, memory_pointer(address + i)[0]);
+    if (frameWidth == 0) {
+        sys_error("frameWidth must be > 0\r\n");
+        return 0;
+    }
+    uint32_t rows = array->length / frameWidth;
+    for (uint32_t r = 0; r < rows; r++) {
+        uint32_t srcBase = address + r * windowWidth + offset;
+        for (uint16_t c = 0; c < frameWidth; c++) {
+            uint8_t val = memory_pointer(srcBase + c)[0];
+            array_write(array, r * frameWidth + c, (uint32_t)val);
+        }
     }
     return 1;
 }
 
-int native_write_bytes(Frame *frame, uint32_t address, uint32_t reference) {
+int native_write_bytes(Frame *frame, uint32_t address, uint32_t reference, uint32_t windowWidth, uint32_t frameWidth, uint32_t offset, int32_t ignoreColor) {
     HeapArray *array = array_get(process_arrays(frame->processes), reference);
-    uint16_t i;
-
     if (NULL == array || 1 != array->element_size) {
         sys_error("Invalid byte array reference\r\n");
         return 0;
     }
-    for (i = 0; i < array->length; i++) {
-        memory_pointer(address + i)[0] = (uint8_t)array_read(array, i);
+    if (frameWidth == 0) {
+        sys_error("frameWidth must be > 0\r\n");
+        return 0;
+    }
+    uint32_t rows = array->length / frameWidth;
+    for (uint32_t r = 0; r < rows; r++) {
+        uint32_t destBase = address + r * windowWidth + offset;
+        for (uint16_t c = 0; c < frameWidth; c++) {
+            uint8_t val = (uint8_t)array_read(array, r * frameWidth + c);
+            if (ignoreColor != -1 && val == (uint8_t)ignoreColor) {
+                continue;
+            }
+            memory_pointer(destBase + c)[0] = val;
+        }
     }
     return 1;
 }
@@ -210,11 +227,11 @@ int native_invoke(Frame *frame, const char *signature, const uint32_t *args) {
         memory_pointer(args[0])[0] = (uint8_t)args[1];
         return 1;
     }
-    if (0 == strcmp(signature, "readBytes(I[B)V")) {
-        return native_read_bytes(frame, args[0], args[1]);
+    if (0 == strcmp(signature, "readBytes(I[BIII)V")) {
+        return native_read_bytes(frame, args[0], args[1], args[2], args[3], args[4]);
     }
-    if (0 == strcmp(signature, "writeBytes(I[B)V")) {
-        return native_write_bytes(frame, args[0], args[1]);
+    if (0 == strcmp(signature, "writeBytes(I[BIIII)V")) {
+        return native_write_bytes(frame, args[0], args[1], args[2], args[3], args[4], args[5]);
     }
     if (0 == strcmp(signature, "writeBytes(III)V")) {
         return native_fill_bytes(frame, (uint32_t)args[0], (uint32_t)args[1], (uint32_t)args[2]);
