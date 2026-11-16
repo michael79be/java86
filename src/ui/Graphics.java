@@ -18,8 +18,16 @@ public class Graphics {
         Native.interrupt(0x10, regs);
     }
 
-    public static void drawPixel(int x, int y, int color) {
+    public static void putPixel(int x, int y, int color) {
         Native.writeByte(0xa0000 + y * width + x, color);
+    }
+
+    public static void putPixels(int x, int y, byte[] pixels) {
+        Native.writeBytes(0xa0000 + y * width + x, pixels);
+    }
+
+    public static void putPixels(int x, int y, int color, int count) {
+        Native.writeBytes(0xa0000 + y * width + x, color, count);
     }
 
     public static void destroy() {

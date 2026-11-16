@@ -132,6 +132,14 @@ int native_write_bytes(Frame *frame, uint32_t address, uint32_t reference) {
     return 1;
 }
 
+int native_fill_bytes(Frame *frame, uint32_t address, uint32_t value, uint32_t count) {
+    uint32_t i;
+    for (i = 0; i < count; i++) {
+        memory_pointer(address + i)[0] = (uint8_t)value;
+    }
+    return 1;
+}
+
 int native_get_address(Frame *frame, uint32_t reference) {
     HeapArray *array = array_get(process_arrays(frame->processes), reference);
 
@@ -207,6 +215,9 @@ int native_invoke(Frame *frame, const char *signature, const uint32_t *args) {
     }
     if (0 == strcmp(signature, "writeBytes(I[B)V")) {
         return native_write_bytes(frame, args[0], args[1]);
+    }
+    if (0 == strcmp(signature, "writeBytes(III)V")) {
+        return native_fill_bytes(frame, (uint32_t)args[0], (uint32_t)args[1], (uint32_t)args[2]);
     }
     if (0 == strcmp(signature, "getAddress([B)I")) {
         return native_get_address(frame, args[0]);

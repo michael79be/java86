@@ -229,7 +229,7 @@ class BuildVM extends VM {
         let previousSize = -1;
 
         while (Date.now() < deadline) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             const hddFs = await mountFatPartition(this.hddBuffer, 63);
             const size = await new Promise(resolve =>
                 hddFs.readFile(`/SRC/${comName}`, (error, data) =>
