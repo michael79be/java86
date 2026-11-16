@@ -35,12 +35,12 @@ public class File {
         Native.interrupt(0x21, regs);
     }
 
-    public static int seek(int handle, int origin) {
+    public static int seek(int handle, int offset, int origin) {
         int[] regs = new int[9];
         regs[0] = 0x4200 + origin;
         regs[1] = handle;
-        regs[2] = 0;
-        regs[3] = 0;
+        regs[2] = offset >> 16;
+        regs[3] = offset & 0xffff;
         regs = Native.interrupt(0x21, regs);
         if ((regs[8] & 1) != 0 || regs[3] != 0) {
             return -1;
@@ -48,37 +48,7 @@ public class File {
         return regs[0];
     }
 
-    public static byte[] read(String path) {
-        int handle = open(path, 0x3d00);
-        if (handle < 0) {
-            return null;
-        }
-        int size = seek(handle, 2);
-        if (size < 0 || seek(handle, 0) < 0) {
-            close(handle);
-            return null;
-        }
-        byte[] data = new byte[size];
-        int address = Native.getAddress(data);
-        int[] regs = new int[9];
-        regs[0] = 0x3f00;
-        regs[1] = handle;
-        regs[2] = size;
-        regs[3] = address & 15;
-        regs[6] = address >> 4;
-        regs = Native.interrupt(0x21, regs);
-        close(handle);
-        if ((regs[8] & 1) != 0 || regs[0] != size) {
-            return null;
-        }
-        return data;
-    }
-
-    public static boolean write(String path, byte[] data) {
-        int handle = open(path, 0x3c00);
-        if (handle < 0) {
-            return false;
-        }
+    public static boolean write(int handle, byte[] data) {
         int address = Native.getAddress(data);
         int[] regs = new int[9];
         regs[0] = 0x4000;
@@ -87,11 +57,26 @@ public class File {
         regs[3] = address & 15;
         regs[6] = address >> 4;
         regs = Native.interrupt(0x21, regs);
-        close(handle);
         if ((regs[8] & 1) != 0 || regs[0] != data.length) {
             return false;
         }
         return true;
+    }
+
+    public static byte[] read(int handle, int count) {
+        byte[] data = new byte[count];
+        int address = Native.getAddress(data);
+        int[] regs = new int[9];
+        regs[0] = 0x3f00;
+        regs[1] = handle;
+        regs[2] = count;
+        regs[3] = address & 15;
+        regs[6] = address >> 4;
+        regs = Native.interrupt(0x21, regs);
+        if ((regs[8] & 1) != 0 || regs[0] != count) {
+            return null;
+        }
+        return data;
     }
 
     static void setDta() {

@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#define FRAME_STACK_SIZE 16
-#define FRAME_LOCALS_SIZE 8
+#define FRAME_STACK_SIZE 64
+#define FRAME_LOCALS_SIZE 64
 #define MAX_UTF8_NAME 128
 
 typedef struct ProcessTable ProcessTable;
@@ -335,6 +335,8 @@ int frame_begin(Frame *frame, ProcessTable *processes, ClassPath *class_path,
     if (frame->code.max_stack > FRAME_STACK_SIZE ||
         frame->code.max_locals > FRAME_LOCALS_SIZE) {
         sys_error("Method frame is too large: ");
+        sys_error(class_name);
+        sys_error(".");
         sys_error(signature);
         sys_error("\r\n");
         return 0;
@@ -510,6 +512,10 @@ int opcode_step(Process *process) {
     case 0x99: case 0x9a: case 0x9b: case 0x9c: case 0x9d: case 0x9e:
     case 0x9f: case 0xa0: case 0xa1: case 0xa2: case 0xa3: case 0xa4:
         return opcode_if(frame, opcode, opcode_pc);
+    case 0x91:
+        if (!frame_pop(frame, &value)) return 0;
+        value = (uint32_t)(int32_t)(int8_t)value;
+        return frame_push(frame, value);
     case 0xa5:
         return opcode_if(frame, 0x9f, opcode_pc);
     case 0xa6:
@@ -530,6 +536,7 @@ int opcode_step(Process *process) {
         return opcode_static_field(frame, 0);
     case 0xb3:
         return opcode_static_field(frame, 1);
+    case 0xb6:
     case 0xb8:
         return opcode_invokestatic(process, frame);
     case 0xbc:

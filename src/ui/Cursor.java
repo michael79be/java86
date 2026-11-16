@@ -10,8 +10,11 @@ public class Cursor {
     public static byte[] mask;
     public static int cursorWidth;
     public static int cursorHeight;
+    public static boolean hide;
 
     public static void main(String[] args) {
+        hide = false;
+
         if (BMP.open("CURSOR.BMP") > 0) {
             cursorWidth = BMP.width;
             cursorHeight = BMP.height;
@@ -26,6 +29,9 @@ public class Cursor {
         getMask();
 
         while (true) {
+            if (hide) {
+                continue;
+            }
             if (x != Mouse.x || y != Mouse.y) {
                 Graphics.waitVbl();
                 drawMask(x, y);
@@ -50,5 +56,15 @@ public class Cursor {
     public static void drawMask(int x, int y) {
         int address = 0xa0000 + y * Graphics.screenWidth;
         Native.writeBytes(address, mask, Graphics.screenWidth, cursorWidth, x, -1);
+    }
+
+    public static void setHidden(boolean hidden) {
+        if (null != mask && hidden) {
+            drawMask(x, y);
+        }
+        if (null != cursor) {
+            drawCursor();
+        }
+        hide = hidden;
     }
 }

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font BMP Generator</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; background: #f5f5f5; color: #222; }
+  h1 { font-size: 20px; margin-bottom: 16px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 16px; background: #fff; padding: 16px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .control { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  label { font-size: 14px; }
+  select, input[type="number"] { font-size: 14px; padding: 4px 8px; }
+  button { font-size: 14px; padding: 6px 14px; cursor: pointer; background: #1a73e8; color: #fff; border: none; border-radius: 4px; }
+  button:hover { background: #1557b0; }
+  button.secondary { background: #666; }
+  button.secondary:hover { background: #555; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #preview { border: 1px solid #ccc; background: #fff; margin-top: 16px; display: block; }
+  .note { font-size: 13px; color: #666; margin-top: 8px; }
+  .row { margin-top: 10px; }
+</style>
+</head>
+<body>
+<h1>Font BMP Generator</h1>
+<div class="controls">
+  <div class="control">
+    <label for="font">Font:</label>
+    <select id="font">
+      <option>system-ui</option>
+      <option>monospace</option>
+      <option>Courier New</option>
+      <option>Consolas</option>
+      <option>Lucida Console</option>
+      <option>serif</option>
+      <option>Times New Roman</option>
+      <option>Georgia</option>
+      <option>sans-serif</option>
+      <option>Arial</option>
+      <option>Verdana</option>
+      <option>Helvetica</option>
+      <option>Impact</option>
+      <option>Wingdings</option>
+    </select>
+  </div>
+  <div class="control">
+    <label for="font-file">Custom TTF:</label>
+    <input type="file" id="font-file" accept=".ttf,.otf">
+  </div>
+  <div class="control">
+    <label for="size">Size (px):</label>
+    <input type="number" id="size" value="16" min="4" max="200">
+  </div>
+  <div class="control">
+    <label><input type="checkbox" id="bold"> Bold</label>
+  </div>
+  <div class="control">
+    <label><input type="checkbox" id="italic"> Italic</label>
+  </div>
+  <div class="control">
+    <label><input type="checkbox" id="antialias"> Antialias (16–31)</label>
+  </div>
+  <div class="control row">
+    <button id="generate">Generate</button>
+    <button id="save" class="secondary" disabled>Save BMP</button>
+  </div>
+</div>
+<textarea id="info" readonly style="margin-top:12px; font-family:monospace; font-size:12px; color:#444; width:100%; height:70px; resize:vertical;"></textarea>
+<canvas id="preview"></canvas>
+<p class="note">Chars 33–255, black text (0) on white background (15), 256-color BMP with standard VGA/DOS palette, bottom-to-top row order.</p>
+<script>
+(function() {
+  const fontSel = document.getElementById('font');
+  const fontFile = document.getElementById('font-file');
+  const sizeIn = document.getElementById('size');
+  const boldCb = document.getElementById('bold');
+  const italicCb = document.getElementById('italic');
+  const aaCb = document.getElementById('antialias');
+  const genBtn = document.getElementById('generate');
+  const saveBtn = document.getElementById('save');
+  const canvas = document.getElementById('preview');
+  const info = document.getElementById('info');
+  canvas.style.backgroundColor = '#fff';
+
+  let lastImageData = null;
+  let lastWidth = 0;
+  let lastHeight = 0;
+  let customFont = null;
+
+  const STORAGE_KEY = 'fontgen_settings';
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.font) {
+        for (let i = 0; i < fontSel.options.length; i++) {
+          if (fontSel.options[i].value === s.font) {
+            fontSel.selectedIndex = i;
+            break;
+          }
+        }
+      }
+      if (s.size) sizeIn.value = s.size;
+      boldCb.checked = s.bold === true;
+      italicCb.checked = s.italic === true;
+      aaCb.checked = s.antialias === true;
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        font: fontSel.value,
+        size: sizeIn.value,
+        bold: boldCb.checked,
+        italic: italicCb.checked,
+        antialias: aaCb.checked
+      }));
+    } catch (e) {}
+  }
+
+  fontFile.addEventListener('change', async () => {
+    const file = fontFile.files[0];
+    if (!file) return;
+    customFont = null;
+    const arrayBuffer = await file.arrayBuffer();
+    const font = new FontFace('CustomFont', arrayBuffer);
+    try {
+      await font.load();
+      document.fonts.add(font);
+      customFont = 'CustomFont';
+      render();
+    } catch (e) {
+      console.error('Failed to load font:', e);
+    }
+  });
+
+  function buildFontString() {
+    const w = boldCb.checked ? 'bold' : 'normal';
+    const s = italicCb.checked ? 'italic' : 'normal';
+    const family = customFont || fontSel.value;
+    return s + ' ' + w + ' ' + sizeIn.value + 'px "' + family + '"';
+  }
+
+  function measureCharWidths() {
+    const tmp = document.createElement('canvas');
+    const tctx = tmp.getContext('2d', { willReadFrequently: true });
+    tctx.font = buildFontString();
+    const widths = [];
+    for (let c = 33; c < 256; c++) {
+      widths.push(Math.ceil(tctx.measureText(String.fromCharCode(c)).width));
+    }
+    return widths;
+  }
+
+  function measureChars() {
+    const widths = measureCharWidths();
+    let max = 0;
+    for (let i = 0; i < widths.length; i++) {
+      if (widths[i] > max) max = widths[i];
+    }
+    return max;
+  }
+
+  function render() {
+    try {
+      canvas.style.backgroundColor = '#fff';
+      const cellHeight = Math.max(1, parseInt(sizeIn.value, 10) || 16);
+      const maxWidth = Math.max(8, measureChars());
+      const charCount = 256 - 33;
+      const width = maxWidth;
+      const height = cellHeight * charCount;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.font = buildFontString();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#000000';
+      ctx.textBaseline = 'middle';
+
+      for (let c = 33; c < 256; c++) {
+        const row = c - 33;
+        const cy = row * cellHeight + cellHeight / 2;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, row * cellHeight, width, cellHeight);
+        ctx.fillStyle = '#000000';
+        ctx.fillText(String.fromCharCode(c), 0, cy);
+      }
+
+      lastImageData = ctx.getImageData(0, 0, width, height);
+      lastWidth = width;
+      lastHeight = height;
+
+      saveBtn.disabled = false;
+
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+
+      info.value = buildInfo();
+    } catch (e) {
+      alert('Generate failed: ' + e.message);
+    }
+  }
+
+  function hsvToRgb(h, s, v) {
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+    let r, g, b;
+    switch (i % 6) {
+      case 0: r = v; g = t; b = p; break;
+      case 1: r = q; g = v; b = p; break;
+      case 2: r = p; g = v; b = t; break;
+      case 3: r = p; g = q; b = v; break;
+      case 4: r = t; g = p; b = v; break;
+      case 5: r = v; g = p; b = q; break;
+    }
+    return [Math.round(r), Math.round(g), Math.round(b)];
+  }
+
+  function dosPalette() {
+    const pal = new Uint8Array(256 * 4);
+    const dos16 = [
+      0,0,0,      0,0,128,    0,128,0,      0,128,128,
+      128,0,0,    128,0,128,  128,128,0,    192,192,192,
+      128,128,128,0,0,255,    0,255,0,      0,255,255,
+      255,0,0,    255,0,255,  255,255,0,    255,255,255
+    ];
+    // 0..15 : palette CGA/EGA standard
+    for (let i = 0; i < 16; i++) {
+      pal[i*4+0] = dos16[i*3+2];
+      pal[i*4+1] = dos16[i*3+1];
+      pal[i*4+2] = dos16[i*3+0];
+      pal[i*4+3] = 0;
+    }
+    // 16..31 : 16 niveaux de gris VGA par défaut
+    for (let i = 16; i < 32; i++) {
+      const g = Math.round((i - 16) * 255 / 15);
+      pal[i*4+0] = g;
+      pal[i*4+1] = g;
+      pal[i*4+2] = g;
+      pal[i*4+3] = 0;
+    }
+    // 32..247 : couleurs HSV VGA par défaut
+    let idx = 32;
+    const vals = [255, 130, 65];
+    const sats = [1.0, 0.5, 0.25];
+    for (let v = 0; v < 3; v++) {
+      for (let s = 0; s < 3; s++) {
+        for (let h = 0; h < 24; h++) {
+          if (idx >= 248) break;
+          const [r, g, b] = hsvToRgb(h / 24, sats[s], vals[v]);
+          pal[idx*4+0] = b;
+          pal[idx*4+1] = g;
+          pal[idx*4+2] = r;
+          pal[idx*4+3] = 0;
+          idx++;
+        }
+      }
+    }
+    // 248..255 : noir
+    for (let i = 248; i < 256; i++) {
+      pal[i*4+0] = 0;
+      pal[i*4+1] = 0;
+      pal[i*4+2] = 0;
+      pal[i*4+3] = 0;
+    }
+    return pal;
+  }
+
+  function buildBmp(imageData, width, height) {
+    const rowSize = Math.ceil(width / 4) * 4;
+    const imageSize = rowSize * height;
+    const paletteSize = 256 * 4;
+    const dibSize = 40;
+    const offset = 14 + dibSize + paletteSize;
+    const fileSize = offset + imageSize;
+
+    const buf = new Uint8Array(fileSize);
+    let p = 0;
+
+    const writeU16 = (v) => { buf[p++] = v & 0xff; buf[p++] = (v >> 8) & 0xff; };
+    const writeU32 = (v) => { buf[p++] = v & 0xff; buf[p++] = (v >> 8) & 0xff; buf[p++] = (v >> 16) & 0xff; buf[p++] = (v >>> 24) & 0xff; };
+
+    buf[p++] = 0x42; buf[p++] = 0x4d;
+    writeU32(fileSize);
+    writeU16(0); writeU16(0);
+    writeU32(offset);
+
+    writeU32(dibSize);
+    writeU32(width);
+    writeU32(height);
+    writeU16(1);
+    writeU16(8);
+    writeU32(0);
+    writeU32(imageSize);
+    writeU32(0); writeU32(0);
+    writeU32(256);
+    writeU32(0);
+
+    const pal = dosPalette();
+    buf.set(pal, p);
+    p += paletteSize;
+
+    const useAA = aaCb.checked;
+    const data = imageData.data;
+    for (let r = height - 1; r >= 0; r--) {
+      const rowStart = r * width * 4;
+      const rowEnd = rowStart + width * 4;
+      for (let i = rowStart; i < rowEnd; i += 4) {
+        const v = Math.round((data[i] + data[i+1] + data[i+2]) / 3);
+        let idx;
+        if (!useAA) {
+          idx = v < 128 ? 0 : 15;
+        } else if (v < 8) {
+          idx = 0;
+        } else if (v > 247) {
+          idx = 15;
+        } else {
+          idx = 16 + Math.round(v * 15 / 255);
+        }
+        buf[p++] = idx;
+      }
+      const pad = (4 - (width % 4)) % 4;
+      for (let k = 0; k < pad; k++) buf[p++] = 0;
+    }
+    return buf;
+  }
+
+  function buildName() {
+    let name = fontSel.value.replace(/\s+/g, '').toUpperCase();
+    if (name.length > 6) name = name.slice(0, 6);
+    let s = String(sizeIn.value);
+    if (s.length === 1) s = '0' + s;
+    else if (s.length > 2) s = s.slice(0, 2);
+    return name + s + (boldCb.checked ? 'B' : '') + (italicCb.checked ? 'I' : '') + '.BMP';
+  }
+
+  function buildInfo() {
+    const name = buildName();
+    const widths = measureCharWidths();
+    let chars = '';
+    for (let i = 0; i < widths.length; i++) {
+      const v = widths[i];
+      chars += String.fromCharCode(v < 208 ? v + 48 : 255);
+    }
+    return 'Add this to your FONTS.DAT library\n' + name + chars;
+  }
+
+  function downloadBmp(buf, width, height) {
+    const blob = new Blob([buf], { type: 'image/bmp' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = buildName();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  genBtn.addEventListener('click', render);
+  saveBtn.addEventListener('click', () => {
+    if (!lastImageData) return;
+    const buf = buildBmp(lastImageData, lastWidth, lastHeight);
+    downloadBmp(buf, lastWidth, lastHeight);
+  });
+
+  const inputs = [fontSel, fontFile, sizeIn, boldCb, italicCb, aaCb];
+  inputs.forEach(el => el.addEventListener('change', () => {
+    saveBtn.disabled = true;
+    lastImageData = null;
+    saveSettings();
+  }));
+  sizeIn.addEventListener('input', () => {
+    saveBtn.disabled = true;
+    lastImageData = null;
+    saveSettings();
+  });
+
+  loadSettings();
+  render();
+})();
+</script>
+</body>
+</html>

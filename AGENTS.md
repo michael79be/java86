@@ -28,9 +28,14 @@ Minimal VM for executing Java 1.4 bytecode from uncompressed ZIP archives on Fre
 - [x] Test Java compilation with janino
 - [x] Implement build.mjs orchestrator
 - [x] Implement java.c interpreter
-
-**In Progress:**
-- [ ] Fix mouse handling: use absolute mouse mode, invert Y, clamp to screen height
+- [x] UI: `Graphics.drawHLine`, `drawVLine`, `drawRect`, `fillRect`
+- [x] UI: `Button.create(text, font)` + `Button.state(bounds, pressed)` 3D border effect
+- [x] UI: `Menu.create(x,y,width,height)` returns `int[] menu` (no draw); `Menu.draw(menu)` fills background color 7 + renders 3D border; `Menu.show(menu)` computes `.MSK` path, captures behind-menu to file (returns `String path`), then draws; `Menu.hide(menu, path)` restores from `.MSK` file
+- [x] UI: `Font.open(path)`, `Font.close()`, `Font.drawChar(font,x,y,char)`, `Font.drawString(font,x,y,text)`, `Font.stringWidth(font,text)` loading widths from `FONTS.DAT`
+- [x] UI: `Mouse.click(bounds)` left-click hit test
+- [x] Demo: `Desktop` renders ToolBar with a Start button using `Font` + `Button`; Start button toggles a `Menu` overlay via `Menu.show`/`Menu.hide`
+- [x] `font.html` browser tool: font/size/bold/italic picker, chars 33-255, 256-color bottom-to-top BMP with DOS palette, DOS 8.3 uppercase filename (font + 2-digit size + B/I), localStorage persistence, copyable FONTS.DAT info line
+- [x] `data/FONTS.DAT`: multi-font width table (font name + 223 width bytes per line, \r\n separated)
 
 ## Code Conventions
 
@@ -92,8 +97,13 @@ src/
   ├── driver/ (Mouse)
   ├── io/ (Console, File)
   ├── platform/ (Native)
-  ├── ui/ (BMP, Cursor, Graphics)
+  ├── ui/ (BMP, Button, Cursor, Font, Graphics, Menu, ToolBar)
   └── utils/ (StringUtils)
+
+data/
+  └── FONTS.DAT (multi-font width table)
+
+font.html (browser font BMP generator)
 
 build/
   ├── *.class (Java bytecode)

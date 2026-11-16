@@ -55,6 +55,15 @@ The terminal you are running the command from will be hooked up to `COM1` of the
 | `npm run make` | Runs `make.mjs` – a dedicated script that only compiles Java sources and creates the JARs (useful for faster iteration). |
 | `npm run init` | Downloads all development dependencies (v86.js, Janino, gcc‑ia16 toolchain, etc.). |
 
+## UI components (`src/ui/`)
+
+- **`Graphics`** – VGA screen primitives: `putPixel`, `putPixels`, `drawHLine`, `drawVLine`, `drawRect`, `fillRect`, `getPixels`/`putPixels` (screen capture/restore via file), `waitVbl`, `destroy`
+- **`Button`** – `create(x,y,width,height,font,text)` draws a raised 3D border and centered text; `state(bounds,pressed)` inverts border colors for pressed effect
+- **`Font`** – `open(path)` loads a 256-color BMP font sheet (chars 33-255) + `FONTS.DAT` widths; `drawChar(font,x,y,charCode)`, `drawString(font,x,y,text)`, `stringWidth(font,text)`, `close()`
+- **`Menu`** – `create(x,y,width,height)` draws border + returns `int[] menu`; `draw(menu)` renders raised 3D border; `show(menu)` computes `.MSK` path, captures behind-menu to file (returns `String path`), then draws; `hide(menu, path)` restores from `.MSK` file
+- **`Cursor`** – mouse cursor with mask/save-restore, runs as its own process
+- **`BMP`** – BMP header parsing and row reading from disk
+
 ---
 
 ## Usage inside DOS
@@ -74,6 +83,13 @@ java -classpath DEMO.JAR;IO.JAR;PLATFORM.JAR demo.Hello
 - ✅ Java compilation via Janino and JAR packaging
 - ✅ gcc‑ia16 toolchain integration (`release/java.com`, `release/hello.com`)
 - ✅ Full Java bytecode interpreter implemented (`src/java.c` through `src/zip.c`)
+- ✅ UI: `Graphics.drawHLine`, `drawVLine`, `drawRect`, `fillRect`
+- ✅ UI: `Button.create(text, font)` + `Button.state(bounds, pressed)` 3D border effect
+- ✅ UI: `Font.open(path)`, `Font.close()`, `Font.drawChar(font,x,y,char)`, `Font.drawString(font,x,y,text)`, `Font.stringWidth(font,text)` loading widths from `FONTS.DAT`
+- ✅ UI: `Mouse.click(bounds)` left-click hit test
+- ✅ Demo: `Desktop` renders ToolBar with a Start button using `Font` + `Button`; Start button toggles a `Menu` overlay via `Menu.show`/`Menu.hide`
+- ✅ `font.html` browser tool: font/size/bold/italic picker, chars 33-255, 256-color bottom-to-top BMP with DOS palette, DOS 8.3 uppercase filename (font + 2-digit size + B/I), localStorage persistence, copyable FONTS.DAT info line
+- ✅ `data/FONTS.DAT`: multi-font width table (font name + 223 width bytes per line, \r\n separated)
 - ⏳ Fix mouse handling: use absolute mouse mode, invert Y, clamp to screen height
 
 ---
