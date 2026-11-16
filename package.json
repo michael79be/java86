@@ -7,6 +7,7 @@
         "init": "node init.mjs",
         "build": "node build.mjs",
         "make": "node make.mjs",
+        "jasm": "node jasm.mjs",
         "start": "node start.mjs",
         "emulator": "node emulator.mjs",
         "test": "node test.mjs"

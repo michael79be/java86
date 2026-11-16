@@ -14,7 +14,7 @@ Minimal VM for executing Java 1.4 bytecode from uncompressed ZIP archives on Fre
 **Native methods:** Via `platform.Native` class (e.g., `Native.interrupt(...)`); console output goes through `io.Console` using DOS interrupts
 
 **Future goals:**
-- JASMIN-compatible assembler in Node (jasm.mjs)
+- None
 
 ## Status
 
@@ -36,6 +36,7 @@ Minimal VM for executing Java 1.4 bytecode from uncompressed ZIP archives on Fre
 - [x] Demo: `Desktop` renders ToolBar with a Start button using `Font` + `Button`; Start button toggles a `Menu` overlay via `Menu.show`/`Menu.hide`
 - [x] `font.html` browser tool: font/size/bold/italic picker, chars 33-255, 256-color bottom-to-top BMP with DOS palette, DOS 8.3 uppercase filename (font + 2-digit size + B/I), localStorage persistence, copyable FONTS.DAT info line
 - [x] `data/FONTS.DAT`: multi-font width table (font name + 223 width bytes per line, \r\n separated)
+- [x] `jasm.mjs`: Jasmin-like assembler compiling `.jasm` to Java 1.4 `.class` files (major version 48); writes to `build/<package>/<Class>.class`; variable-length constant pool encoding matching `cpool.c`; `npm run jasm -- <input.jasm> [output_dir]`
 
 ## Code Conventions
 
@@ -107,10 +108,10 @@ font.html (browser font BMP generator)
 
 build/
   ├── *.class (Java bytecode)
-  └── *.JAR (uncompressed per-package: DEMO.JAR, DRIVER.JAR, IO.JAR, PLATFORM.JAR, UI.JAR, UTILS.JAR)
+  └── demo/ (jasm .jasm output, packaged into JARs)
 
 release/
-  └── *.com (compiled C binaries: java.com, hello.com)
+  └── *.com, *.JAR (compiled C binaries: java.com, hello.com; packaged JARs: DEMO.JAR, DRIVER.JAR, IO.JAR, PLATFORM.JAR, UI.JAR, UTILS.JAR)
 
 .mjs scripts:
   ├── init.mjs (download & setup, builds HDD image)
@@ -119,6 +120,7 @@ release/
   ├── start.mjs (interactive FreeDOS terminal)
   ├── build.mjs (automated Java + C build)
   ├── make.mjs (Java compilation + JAR packaging only)
+  ├── jasm.mjs (Jasmin-like assembler, `.jasm` → Java 1.4 `.class`; `npm run jasm -- <input.jasm> [output_dir]`)
   └── emulator.mjs (HTTP server, port 8086, VGA screen)
 ```
 
@@ -135,7 +137,7 @@ release/
 - `copySources`: copies `src/` to `/SRC/` on the HDD image
 - `copyDevel`: copies toolchain to `/I16GNU/` and `/DJGPP/`
 - `copyTools`: copies MKEYB/VBMOUSE to `/TOOLS/`
-- `copyBuildOutputs`: copies `release/*.COM` and `build/*.JAR` to C:\
+- `copyBuildOutputs`: copies `release/*.COM` and `release/*.JAR` to C:\
 - `copyData`: copies `data/` to C:\
 - In-memory buffer; optional disk cache
 
@@ -147,6 +149,8 @@ release/
 
 **start.mjs**
 - Launches VM with interactive serial terminal (CTTY COM1 ↔ stdin/stdout)
+- Accepts optional main class argument: `npm run start -- <class>` (default: `demo.Desktop`)
+- AUTOEXEC.BAT uses `%MAIN_CLASS%` placeholder, replaced at VM boot
 - Reads/writes to V86 stdin/stdout
 
 **build.mjs**
@@ -157,12 +161,13 @@ release/
 
 **make.mjs**
 - Compiles all `.java` files under `src/` with Janino into `build/`
-- Packages each top-level package into an uncompressed per-package JAR (e.g. `build/DEMO.JAR`)
+- Packages each top-level package into an uncompressed per-package JAR (e.g. `release/DEMO.JAR`)
 - Usage: `npm run make`
 
 **emulator.mjs**
 - Node HTTP server (`npm run emulator`, port 8086) serving the browser build of v86 with VGA screen and keyboard
 - Prepares the same floppy/HDD images as vm.mjs but strips `CTTY` from AUTOEXEC.BAT so the console stays on the VGA screen
+- Replaces `%MAIN_CLASS%` placeholder with `demo.Desktop`
 
 **java.c, sys.c, jar.c, class.c, cpool.c, method.c, array.c, field.c, opcode.c, math.c, native.c, proc.c, zip.c**
 - `java.com -classpath DEMO.JAR;PLATFORM.JAR demo.Hello` searches uncompressed ZIP entries in the classpath JARs
@@ -192,7 +197,9 @@ release/
 
 ```bash
 npm run init                   # Install Node deps + download toolchain
-npm run make                   # Compile Java sources + package JARs (fast iteration)
+npm run make                   # Compile Java sources + package JARs to release/ (fast iteration)
+npm run jasm -- <input.jasm>   # Assemble a .jasm file to build/<package>/<Class>.class
+npm run make                   # Repackage JARs including jasm output to release/
 npm run start                  # Interactive FreeDOS terminal (serial)
 npm run emulator               # Browser-based VGA emulator (port 8086)
 npm run build -- src/java.c    # Full build: Java + compile selected C file to release/

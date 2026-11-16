@@ -49,9 +49,10 @@ The terminal you are running the command from will be hooked up to `COM1` of the
 
 | Script | Description |
 |--------|-------------|
-| `npm run start` | Launches DOS with serial redirection, copies `.COM` files from `release/` and `.JAR` files from `build/` to the C: drive. |
+| `npm run start` | Launches DOS with serial redirection. Accepts optional main class: `npm run start -- demo.HelloWorld` (default: `demo.Desktop`). Copies `.COM` files from `release/` and `.JAR` files from `release/` to the C: drive. |
 | `npm run emulator` | Serves the V86.js UI on `http://localhost:8086/` – you can interact with DOS through a VGA screen in the browser. |
 | `npm run build -- src/java.c` | Compiles all Java source files in `src/` with Janino, creates an uncompressed JAR per package, then compiles the specified C file (`java.c`) into `java.com`. |
+| `npm run jasm -- <input.jasm> [output_dir]` | Runs `jasm.mjs` – assembles a `.jasm` file into a Java 1.4 `.class` file under `build/<package>/` |
 | `npm run make` | Runs `make.mjs` – a dedicated script that only compiles Java sources and creates the JARs (useful for faster iteration). |
 | `npm run init` | Downloads all development dependencies (v86.js, Janino, gcc‑ia16 toolchain, etc.). |
 
@@ -90,6 +91,7 @@ java -classpath DEMO.JAR;IO.JAR;PLATFORM.JAR demo.Hello
 - ✅ Demo: `Desktop` renders ToolBar with a Start button using `Font` + `Button`; Start button toggles a `Menu` overlay via `Menu.show`/`Menu.hide`
 - ✅ `font.html` browser tool: font/size/bold/italic picker, chars 33-255, 256-color bottom-to-top BMP with DOS palette, DOS 8.3 uppercase filename (font + 2-digit size + B/I), localStorage persistence, copyable FONTS.DAT info line
 - ✅ `data/FONTS.DAT`: multi-font width table (font name + 223 width bytes per line, \r\n separated)
+- ✅ `jasm.mjs`: Jasmin-like assembler compiling `.jasm` to Java 1.4 `.class` files (major version 48); `npm run jasm -- <input.jasm> [output_dir]`
 - ⏳ Fix mouse handling: use absolute mouse mode, invert Y, clamp to screen height
 
 ---

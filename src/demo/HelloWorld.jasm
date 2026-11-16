@@ -1,4 +1,4 @@
-.class public HelloWorld
+.class public demo/HelloWorld
 .super java/lang/Object
 
 .method public <init>()V

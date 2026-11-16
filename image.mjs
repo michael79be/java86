@@ -280,7 +280,7 @@ async function copyBuildOutputs(fs, projectDir) {
 
     if (existsSync(releaseDir)) {
         for (const entry of readdirSync(releaseDir, { withFileTypes: true })) {
-            if (entry.isFile() && entry.name.toLowerCase().endsWith('.com')) {
+            if (entry.isFile() && (entry.name.toLowerCase().endsWith('.com') || entry.name.toUpperCase().endsWith('.JAR'))) {
                 files.push({ name: entry.name, path: resolve(releaseDir, entry.name) });
             }
         }

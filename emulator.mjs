@@ -34,6 +34,7 @@ class EmulatorServer {
         const floppyBuffer = Buffer.from(readFileSync(resolve(this.binDir, 'freedos722.img')));
         const floppyFs = await mountFatPartition(floppyBuffer, 0);
         const autoexecContent = readFileSync(resolve(this.projectDir, 'AUTOEXEC.BAT'), 'utf8')
+            .replace(/%MAIN_CLASS%/g, 'demo.Desktop')
             .split(/\r?\n/)
             .filter(line => !line.trim().toUpperCase().startsWith('CTTY'))
             .join('\r\n');

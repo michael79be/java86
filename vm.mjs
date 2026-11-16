@@ -26,7 +26,7 @@ export class VM {
         ].join('\r\n');
     }
 
-    async initialize() {
+    async initialize(mainClass = 'demo.Desktop') {
         console.log('Loading FreeDOS image...');
         const floppyPath = resolve(this.binDir, 'freedos722.img');
         const floppyBuffer = Buffer.from(readFileSync(floppyPath));
@@ -40,6 +40,7 @@ export class VM {
         } catch {
             throw new Error(`Failed to read AUTOEXEC.BAT from ${autoexecPath}`);
         }
+        autoexecContent = autoexecContent.replace(/%MAIN_CLASS%/g, mainClass);
 
         await new Promise((res, rej) =>
             floppyFs.writeFile('/AUTOEXEC.BAT', autoexecContent, (e) => (e ? rej(e) : res()))

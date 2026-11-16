@@ -3,8 +3,11 @@
 import { VM } from './vm.mjs';
 import readline from 'node:readline';
 
+const args = process.argv.slice(2);
+const mainClass = args.length > 0 ? args[0] : 'demo.Desktop';
+
 const vm = new VM();
-await vm.initialize();
+await vm.initialize(mainClass);
 
 console.log('\n[V86] FreeDOS VM booted. Interactive TTY active.\n');
 

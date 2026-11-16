@@ -31,6 +31,9 @@ export class Make {
         const buildDir = resolve(this.projectDir, 'build');
         mkdirSync(buildDir, { recursive: true });
 
+        const releaseDir = resolve(this.projectDir, 'release');
+        mkdirSync(releaseDir, { recursive: true });
+
         const quote = (value) => `'${value.replace(/'/g, "'\\''")}'`;
         const command = [
             'java',
@@ -62,11 +65,11 @@ export class Make {
         }
 
         for (const [packageName, files] of packages) {
-            await this.createPackageJar(buildDir, packageName, files);
+            await this.createPackageJar(buildDir, releaseDir, packageName, files);
         }
     }
 
-    async createPackageJar(buildDir, packageName, classFiles) {
+    async createPackageJar(buildDir, jarDir, packageName, classFiles) {
         const SevenZipFactory = (await import('7z-wasm')).default;
         const sevenZip = await SevenZipFactory({ noFSInit: false });
         const archiveRoot = '/classes';
@@ -96,7 +99,7 @@ export class Make {
         }
 
         sevenZip.FS.chdir(archiveRoot);
-        const jarPath = resolve(buildDir, jarName);
+        const jarPath = resolve(jarDir, jarName);
         console.log(`[BUILD] Creating uncompressed ${jarPath}...`);
         sevenZip.callMain(['a', '-tzip', `/${jarName}`, ...archiveFiles, '-mx=0']);
         writeFileSync(jarPath, Buffer.from(sevenZip.FS.readFile(`/${jarName}`)));
