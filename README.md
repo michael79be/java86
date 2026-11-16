@@ -87,7 +87,7 @@ java -classpath DEMO.JAR;IO.JAR;PLATFORM.JAR demo.Hello
 - ✅ UI: `Graphics.drawHLine`, `drawVLine`, `drawRect`, `fillRect`
 - ✅ UI: `Button.create(text, font)` + `Button.state(bounds, pressed)` 3D border effect
 - ✅ UI: `Font.open(path)`, `Font.close()`, `Font.drawChar(font,x,y,char)`, `Font.drawString(font,x,y,text)`, `Font.stringWidth(font,text)` loading widths from `FONTS.DAT`
-- ✅ UI: `Mouse.click(bounds)` left-click hit test
+- ✅ UI: `Mouse.click(bounds)` left-click hit test; `Mouse.in(bounds)` inside-bounds test; `Mouse.out(bounds)` outside-bounds test
 - ✅ Demo: `Desktop` renders ToolBar with a Start button using `Font` + `Button`; Start button toggles a `Menu` overlay via `Menu.show`/`Menu.hide`
 - ✅ `font.html` browser tool: font/size/bold/italic picker, chars 33-255, 256-color bottom-to-top BMP with DOS palette, DOS 8.3 uppercase filename (font + 2-digit size + B/I), localStorage persistence, copyable FONTS.DAT info line
 - ✅ `data/FONTS.DAT`: multi-font width table (font name + 223 width bytes per line, \r\n separated)

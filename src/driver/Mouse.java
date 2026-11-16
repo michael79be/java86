@@ -27,6 +27,16 @@ public class Mouse {
             && y >= bounds[1] && y < bounds[1] + bounds[3];
     }
 
+    public static boolean in(int[] bounds) {
+        return x >= bounds[0] && x < bounds[0] + bounds[2]
+            && y >= bounds[1] && y < bounds[1] + bounds[3];
+    }
+
+    public static boolean out(int[] bounds) {
+        return x < bounds[0] || x >= bounds[0] + bounds[2]
+            || y < bounds[1] || y >= bounds[1] + bounds[3];
+    }
+
     public static void main(String[] args) {
         int[] regs = new int[9];
         regs[0] = 0;
