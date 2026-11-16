@@ -1,42 +1,88 @@
 # java86
 
-Interpréteur minimal de bytecode Java 1.4 pour FreeDOS 16-bit via V86.js + Node.js.
+**Minimal Java 1.4 bytecode interpreter for 16‑bit DOS**
 
-## Démarrage rapide
+This repository contains a tiny virtual machine that can run Java 1.4 class files on a 16‑bit DOS environment. The VM is built on top of the **v86.js** x86 emulator running under Node.js, providing a full DOS system with serial I/O redirection.
+
+---
+
+## Quick start
 
 ```bash
+# Install node dependencies
 npm install
+
+# Download DOS dependencies
+npm run init
+
+# Start DOS with a serial console (CTTY COM1)
 npm run start
 ```
 
-Affichage interactif FreeDOS avec redirection série. Les commandes DOS fonctionnent.
+The terminal you are running the command from will be hooked up to `COM1` of the emulated DOS machine, so any DOS command you type is executed inside the VM. The VM automatically copies compiled `.COM` binaries from `release/` and all `.JAR` files from `build/` to the root of the C: drive.
 
-## Architecture
+---
 
-- **V86 + FreeDOS**: Émulateur x86 16-bit en Node.js
-- **Redirection série**: CTTY COM1 → stdout/stdin Node
-- **Compilation C**: gcc-ia16 dans FreeDOS
-- **VM bytecode**: À implémenter
+## Architecture overview
 
-## Contraintes
+- **v86.js + DOS** – 16‑bit x86 emulator written in JavaScript. Runs inside Node.js and provides a VGA screen, keyboard and serial ports.
+- **Serial redirection** – `CTTY COM1` inside DOS is wired to the Node.js process’ `stdin`/`stdout`, giving you a live console.
+- **C toolchain** – `gcc-ia16` (tiny model) is used inside the emulated environment to compile the VM (`java.c`) and any native helpers.
+- **Java compilation** – Java source files in `src/` are compiled with **Janino** (via `make.mjs`). The resulting `.class` files are packaged into **uncompressed JARs** (one per top‑level package) placed in `build/`.
+- **Native bridge** – `platform.Native` exposes a small set of native functions (memory access, interrupts, I/O) to Java code.
+- **Executable size** – The final binary (`java.com`) is a **NEAR** model executable limited to **< 64 KB**.
 
-- Méthodes statiques uniquement
-- Pas d'objets/interfaces/long/double
-- Classes lues depuis ZIP sans compression
-- Recherche des classes dans les JAR indiqués par `-classpath`, séparés par `;`
-- Natives via `platform.Native`
-- Exécutable < 64K NEAR
+---
 
-## Scripts
+## Constraints (by design)
 
-- `npm run start` — Lance FreeDOS avec TTY série et copie les `.COM` de `release/` ainsi que les `.JAR` de `build/` à la racine du disque C:
-- `npm run emulator` — Sert FreeDOS dans le navigateur (écran VGA + clavier) sur http://localhost:8086/
-- `npm run build -- src/java.c` — Compile les sources Java avec Janino, crée un JAR sans compression par package (ex. `build/DEMO.JAR`, `build/PLATFORM.JAR`), puis compile uniquement le fichier C indiqué
-- `npm run install:dev` — Télécharge dépendances
+- Only **static methods** are supported – no object instances.
+- No support for `long`, `double`, interfaces or inheritance beyond the simple static lookup.
+- All classes must be stored **uncompressed** inside ZIP/JAR entries.
+- Classpath is a semi‑colon (`;`) separated list of JAR files.
+- Native methods are called through `platform.Native`.
+- The VM runs in a **tiny** memory model (single 64 KB segment for code, data, stack and heap).
 
-Dans FreeDOS : `java -classpath DEMO.JAR;PLATFORM.JAR demo.Hello`. Les JAR restent ouverts pendant l'exécution ; le cache de dix entrées utilise le CRC16 du nom et ne détecte pas les collisions.
+---
 
-## État
+## Build scripts
 
-✅ V86 + FreeDOS + redirection série fonctionne
-⏳ gcc-ia16 setup, Java compiler, bytecode interpreter
+| Script | Description |
+|--------|-------------|
+| `npm run start` | Launches DOS with serial redirection, copies `.COM` files from `release/` and `.JAR` files from `build/` to the C: drive. |
+| `npm run emulator` | Serves the V86.js UI on `http://localhost:8086/` – you can interact with DOS through a VGA screen in the browser. |
+| `npm run build -- src/java.c` | Compiles all Java source files in `src/` with Janino, creates an uncompressed JAR per package, then compiles the specified C file (`java.c`) into `java.com`. |
+| `npm run make` | Runs `make.mjs` – a dedicated script that only compiles Java sources and creates the JARs (useful for faster iteration). |
+| `npm run init` | Downloads all development dependencies (v86.js, Janino, gcc‑ia16 toolchain, etc.). |
+
+---
+
+## Usage inside DOS
+
+```bash
+java -classpath DEMO.JAR;IO.JAR;PLATFORM.JAR demo.Hello
+```
+
+- The JAR files stay open for the lifetime of the VM; class loading uses a ten‑entry circular cache indexed by the CRC‑16 of the class name.
+- The interpreter expects a `main(String[] args)` static method.
+
+---
+
+## Current status
+
+- ✅ v86.js emulation and serial redirection working
+- ✅ Java compilation via Janino and JAR packaging
+- ✅ gcc‑ia16 toolchain integration, full Java bytecode interpreter implementation pending
+- ⏳ Advanced graphics features (double‑buffering, VESA modes) under development
+
+---
+
+## Contributing
+
+Feel free to open issues or submit pull requests. The project follows a **no‑comments** code style (self‑explanatory identifiers, 4‑space indentation, no trailing whitespace).
+
+---
+
+## License
+
+This project is released under the MIT License.
