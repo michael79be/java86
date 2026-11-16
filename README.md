@@ -72,8 +72,9 @@ java -classpath DEMO.JAR;IO.JAR;PLATFORM.JAR demo.Hello
 
 - ✅ v86.js emulation and serial redirection working
 - ✅ Java compilation via Janino and JAR packaging
-- ✅ gcc‑ia16 toolchain integration, full Java bytecode interpreter implementation pending
-- ⏳ Advanced graphics features (double‑buffering, VESA modes) under development
+- ✅ gcc‑ia16 toolchain integration (`release/java.com`, `release/hello.com`)
+- ✅ Full Java bytecode interpreter implemented (`src/java.c` through `src/zip.c`)
+- ⏳ Fix mouse handling: use absolute mouse mode, invert Y, clamp to screen height
 
 ---
 

@@ -19,6 +19,8 @@ public class Native {
 
     public static native void writeBytes(int address, int value, int count);
 
+    public static native int readPort(int port);
+
     public static native int getAddress(byte[] buffer);
 
     public static native int[] interrupt(int number, int[] regs);

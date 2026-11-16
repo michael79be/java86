@@ -4,16 +4,19 @@ import platform.Native;
 
 public class Graphics {
     public static int screenWidth;
+    public static int screenHeight;
 
     public static void create(int vesaMode) {
         int[] regs = new int[9];
-        if (vesaMode < 256) {
+        if (0x13 == vesaMode) {
             regs[0] = vesaMode;
             screenWidth = 320;
-        } else {
+            screenHeight = 200;
+        } else if (0x101 == vesaMode) {
             regs[0] = 0x4f02;
             regs[1] = vesaMode;
             screenWidth = 640;
+            screenHeight = 480;
         }
         Native.interrupt(0x10, regs);
     }
@@ -28,6 +31,11 @@ public class Graphics {
 
     public static void putPixels(int x, int y, int color, int count) {
         Native.writeBytes(0xa0000 + y * screenWidth + x, color, count);
+    }
+    
+    public static void waitVbl() {
+        while ((Native.readPort(0x3da) & 0x08) != 0);
+        while ((Native.readPort(0x3da) & 0x08) == 0);
     }
 
     public static void destroy() {

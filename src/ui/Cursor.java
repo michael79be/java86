@@ -27,13 +27,12 @@ public class Cursor {
 
         while (true) {
             if (x != Mouse.x || y != Mouse.y) {
-                if (Mouse.x != x || Mouse.y != y) {
-                    drawMask(x, y);
-                    x = Mouse.x;
-                    y = Mouse.y;
-                    getMask();
-                    drawCursor();
-                }
+                Graphics.waitVbl();
+                drawMask(x, y);
+                x = Mouse.x;
+                y = Mouse.y;
+                getMask();
+                drawCursor();
             }
         }
     }

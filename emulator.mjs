@@ -56,38 +56,7 @@ class EmulatorServer {
     }
 
     pageHtml() {
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>java86</title>
-<style>
-body { background: #202020; color: #d0d0d0; font-family: monospace; margin: 16px; }
-#screen_container { display: inline-block; background: #000000; padding: 8px; }
-</style>
-</head>
-<body>
-<h1>java86 FreeDOS emulator</h1>
-<div id="screen_container">
-<div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
-<canvas style="display: none"></canvas>
-</div>
-<script src="libv86.js"></script>
-<script>
-new V86({
-    wasm_path: "v86.wasm",
-    screen_container: document.getElementById("screen_container"),
-    bios: { url: "seabios.bin" },
-    vga_bios: { url: "vgabios.bin" },
-    fda: { url: "floppy.img" },
-    hda: { url: "hdd.img" },
-    memory_size: 256 * 1024 * 1024,
-    autostart: true
-});
-</script>
-</body>
-</html>
-`;
+        return readFileSync(resolve(this.projectDir, 'emulator.html'), 'utf8');
     }
 
     async initialize() {

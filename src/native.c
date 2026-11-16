@@ -44,12 +44,22 @@ void interrupt_invoke(void) {
 ArrayData memory_pointer(uint32_t address) {
     return (ArrayData)(((address >> 4) << 16) | (address & 0xf));
 }
+
+static void set_VESA_bank(uint32_t bank) {
+    interrupt_registers[0] = 0x4F05;
+    interrupt_registers[1] = 0x0000;
+    interrupt_registers[3] = (uint16_t)bank;
+    interrupt_thunk[1] = 0x10;
+    interrupt_invoke();
+}
 #else
 static uint8_t host_memory[0x100000];
 
 ArrayData memory_pointer(uint32_t address) {
     return &host_memory[address & 0xfffffUL];
 }
+
+static void set_VESA_bank(uint32_t bank) { (void)bank; }
 #endif
 
 int native_new_process(Frame *frame, uint32_t reference) {
@@ -115,11 +125,52 @@ int native_read_bytes(Frame *frame, uint32_t address, uint32_t reference, uint32
         return 0;
     }
     uint32_t rows = array->length / frameWidth;
+    int32_t current_bank = -1;
+
     for (uint32_t r = 0; r < rows; r++) {
         uint32_t srcBase = address + r * windowWidth + offset;
-        for (uint16_t c = 0; c < frameWidth; c++) {
-            uint8_t val = memory_pointer(srcBase + c)[0];
-            array_write(array, r * frameWidth + c, (uint32_t)val);
+
+        if (srcBase >= 0xa0000) {
+            uint32_t linear_start = srcBase - 0xa0000;
+            uint32_t linear_end = linear_start + frameWidth - 1;
+            uint32_t bank_start = linear_start >> 16;
+            uint32_t bank_end = linear_end >> 16;
+
+            if (bank_start == bank_end) {
+                if (current_bank != (int32_t)bank_start) {
+                    set_VESA_bank(bank_start);
+                    current_bank = bank_start;
+                }
+                for (uint16_t c = 0; c < frameWidth; c++) {
+                    uint8_t val = memory_pointer(0xa0000 + (linear_start & 0xffff) + c)[0];
+                    array_write(array, r * frameWidth + c, (uint32_t)val);
+                }
+            } else {
+                uint32_t split_c = 65536 - (linear_start & 0xffff);
+
+                if (current_bank != (int32_t)bank_start) {
+                    set_VESA_bank(bank_start);
+                    current_bank = bank_start;
+                }
+                for (uint16_t c = 0; c < split_c; c++) {
+                    uint8_t val = memory_pointer(0xa0000 + (linear_start & 0xffff) + c)[0];
+                    array_write(array, r * frameWidth + c, (uint32_t)val);
+                }
+
+                if (current_bank != (int32_t)bank_end) {
+                    set_VESA_bank(bank_end);
+                    current_bank = bank_end;
+                }
+                for (uint16_t c = split_c; c < frameWidth; c++) {
+                    uint8_t val = memory_pointer(0xa0000 + (c - split_c))[0];
+                    array_write(array, r * frameWidth + c, (uint32_t)val);
+                }
+            }
+        } else {
+            for (uint16_t c = 0; c < frameWidth; c++) {
+                uint8_t val = memory_pointer(srcBase + c)[0];
+                array_write(array, r * frameWidth + c, (uint32_t)val);
+            }
         }
     }
     return 1;
@@ -135,26 +186,111 @@ int native_write_bytes(Frame *frame, uint32_t address, uint32_t reference, uint3
         sys_error("frameWidth must be > 0\r\n");
         return 0;
     }
+
     uint32_t rows = array->length / frameWidth;
+    int32_t current_bank = -1;
+
     for (uint32_t r = 0; r < rows; r++) {
         uint32_t destBase = address + r * windowWidth + offset;
-        for (uint16_t c = 0; c < frameWidth; c++) {
-            uint8_t val = (uint8_t)array_read(array, r * frameWidth + c);
-            if (ignoreColor != -1 && val == (uint8_t)ignoreColor) {
-                continue;
+
+        if (destBase >= 0xa0000) {
+            uint32_t linear_start = destBase - 0xa0000;
+            uint32_t linear_end = linear_start + frameWidth - 1;
+            uint32_t bank_start = linear_start >> 16;
+            uint32_t bank_end = linear_end >> 16;
+
+            if (bank_start == bank_end) {
+                if (current_bank != (int32_t)bank_start) {
+                    set_VESA_bank(bank_start);
+                    current_bank = bank_start;
+                }
+                for (uint16_t c = 0; c < frameWidth; c++) {
+                    uint8_t val = (uint8_t)array_read(array, r * frameWidth + c);
+                    if (ignoreColor != -1 && val == (uint8_t)ignoreColor) continue;
+                    memory_pointer(0xa0000 + (linear_start & 0xffff) + c)[0] = val;
+                }
+            } else {
+                uint32_t split_c = 65536 - (linear_start & 0xffff);
+
+                if (current_bank != (int32_t)bank_start) {
+                    set_VESA_bank(bank_start);
+                    current_bank = bank_start;
+                }
+                for (uint16_t c = 0; c < split_c; c++) {
+                    uint8_t val = (uint8_t)array_read(array, r * frameWidth + c);
+                    if (ignoreColor != -1 && val == (uint8_t)ignoreColor) continue;
+                    memory_pointer(0xa0000 + (linear_start & 0xffff) + c)[0] = val;
+                }
+
+                if (current_bank != (int32_t)bank_end) {
+                    set_VESA_bank(bank_end);
+                    current_bank = bank_end;
+                }
+                for (uint16_t c = split_c; c < frameWidth; c++) {
+                    uint8_t val = (uint8_t)array_read(array, r * frameWidth + c);
+                    if (ignoreColor != -1 && val == (uint8_t)ignoreColor) continue;
+                    memory_pointer(0xa0000 + (c - split_c))[0] = val;
+                }
             }
-            memory_pointer(destBase + c)[0] = val;
+        } else {
+            for (uint16_t c = 0; c < frameWidth; c++) {
+                uint8_t val = (uint8_t)array_read(array, r * frameWidth + c);
+                if (ignoreColor != -1 && val == (uint8_t)ignoreColor) continue;
+                memory_pointer(destBase + c)[0] = val;
+            }
         }
     }
     return 1;
 }
 
 int native_fill_bytes(Frame *frame, uint32_t address, uint32_t value, uint32_t count) {
-    uint32_t i;
-    for (i = 0; i < count; i++) {
-        memory_pointer(address + i)[0] = (uint8_t)value;
+    if (address >= 0xa0000) {
+        uint32_t linear_start = address - 0xa0000;
+        uint32_t current_pos = 0;
+        int32_t current_bank = -1;
+
+        while (current_pos < count) {
+            uint32_t abs_linear = linear_start + current_pos;
+            uint32_t bank = abs_linear >> 16;
+            uint32_t offset = abs_linear & 0xffff;
+            uint32_t chunk = 65536 - offset;
+            if (current_pos + chunk > count) {
+                chunk = count - current_pos;
+            }
+
+            if (current_bank != (int32_t)bank) {
+                set_VESA_bank(bank);
+                current_bank = (int32_t)bank;
+            }
+
+            for (uint32_t i = 0; i < chunk; i++) {
+                memory_pointer(0xa0000 + offset + i)[0] = (uint8_t)value;
+            }
+            current_pos += chunk;
+        }
+    } else {
+        for (uint32_t i = 0; i < count; i++) {
+            memory_pointer(address + i)[0] = (uint8_t)value;
+        }
     }
     return 1;
+}
+
+#ifdef __ia16__
+static inline uint8_t inb(uint16_t port) {
+    uint8_t ret;
+    __asm__ volatile ("inb %1, %0" : "=a" (ret) : "Nd" (port));
+    return ret;
+}
+#endif
+
+int native_read_port(Frame *frame, uint32_t port) {
+#ifdef __ia16__
+    return frame_push(frame, inb((uint16_t)port));
+#else
+    (void)port;
+    return frame_push(frame, 0);
+#endif
 }
 
 int native_get_address(Frame *frame, uint32_t reference) {
@@ -207,6 +343,16 @@ int native_interrupt(Frame *frame, uint32_t number, uint32_t reference) {
 #endif
 }
 
+static void write_byte_mapped(uint32_t address, uint8_t value) {
+    if (address >= 0xa0000) {
+        uint32_t linear = address - 0xa0000;
+        set_VESA_bank(linear >> 16);
+        memory_pointer(0xa0000 + (linear & 0xffff))[0] = value;
+    } else {
+        memory_pointer(address)[0] = value;
+    }
+}
+
 int native_invoke(Frame *frame, const char *signature, const uint32_t *args) {
     if (0 == strcmp(signature, "newProcess(Ljava/lang/String;)I")) {
         return native_new_process(frame, args[0]);
@@ -224,7 +370,7 @@ int native_invoke(Frame *frame, const char *signature, const uint32_t *args) {
         return frame_push(frame, memory_pointer(args[0])[0]);
     }
     if (0 == strcmp(signature, "writeByte(II)V")) {
-        memory_pointer(args[0])[0] = (uint8_t)args[1];
+        write_byte_mapped(args[0], (uint8_t)args[1]);
         return 1;
     }
     if (0 == strcmp(signature, "readBytes(I[BIII)V")) {
@@ -235,6 +381,9 @@ int native_invoke(Frame *frame, const char *signature, const uint32_t *args) {
     }
     if (0 == strcmp(signature, "writeBytes(III)V")) {
         return native_fill_bytes(frame, (uint32_t)args[0], (uint32_t)args[1], (uint32_t)args[2]);
+    }
+    if (0 == strcmp(signature, "readPort(I)I")) {
+        return native_read_port(frame, args[0]);
     }
     if (0 == strcmp(signature, "getAddress([B)I")) {
         return native_get_address(frame, args[0]);

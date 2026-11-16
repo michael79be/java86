@@ -2,6 +2,7 @@ package driver;
 
 import io.Console;
 import platform.Native;
+import ui.Graphics;
 
 public class Mouse {
     public static int x;
@@ -20,7 +21,7 @@ public class Mouse {
             regs[0] = 3;
             Native.interrupt(0x33, regs);
             x = regs[2];
-            y = regs[3];
+            y = (regs[3] * Graphics.screenHeight) / 200;
             button = regs[1];
         }
     }
