@@ -31,8 +31,9 @@ Minimal VM for executing Java 1.4 bytecode from uncompressed ZIP archives on Fre
 - [x] UI: `Graphics.drawHLine`, `drawVLine`, `drawRect`, `fillRect`
 - [x] UI: `Button.create(text, font)` + `Button.state(bounds, pressed)` 3D border effect
 - [x] UI: `Menu.create(x,y,width,height)` returns `int[] menu` (no draw); `Menu.draw(menu)` fills background color 7 + renders 3D border; `Menu.show(menu)` computes `.MSK` path, captures behind-menu to file (returns `String path`), then draws; `Menu.hide(menu, path)` restores from `.MSK` file
+- [x] UI: `MenuItem.create(menu, font, text, pos)` returns `int[] item` ([x, y, width, height, pressed]) filled color 7 with padding + draws text; `MenuItem.state(item, pressed)` draws a down bevel border (color 8/15) like `Button.state` without filling or redrawing text; skips if already in requested state
 - [x] UI: `Font.open(path)`, `Font.close()`, `Font.drawChar(font,x,y,char)`, `Font.drawString(font,x,y,text)`, `Font.stringWidth(font,text)` loading widths from `FONTS.DAT`
-- [x] UI: `Mouse.click(bounds)` left-click hit test
+- [x] UI: `Mouse.click(bounds)` left-click hit test; `Mouse.in(bounds)` inside-bounds test; `Mouse.out(bounds)` outside-bounds test
 - [x] Demo: `Desktop` renders ToolBar with a Start button using `Font` + `Button`; Start button toggles a `Menu` overlay via `Menu.show`/`Menu.hide`
 - [x] `font.html` browser tool: font/size/bold/italic picker, chars 33-255, 256-color bottom-to-top BMP with DOS palette, DOS 8.3 uppercase filename (font + 2-digit size + B/I), localStorage persistence, copyable FONTS.DAT info line
 - [x] `data/FONTS.DAT`: multi-font width table (font name + 223 width bytes per line, \r\n separated)
@@ -161,7 +162,9 @@ release/
 
 **make.mjs**
 - Compiles all `.java` files under `src/` with Janino into `build/`
+- Incremental: skips compilation if no `.java` source is newer than its `.class`
 - Packages each top-level package into an uncompressed per-package JAR (e.g. `release/DEMO.JAR`)
+- Incremental: skips JAR repackaging if no `.class` in the package is newer than the JAR
 - Usage: `npm run make`
 
 **emulator.mjs**

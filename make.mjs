@@ -1,6 +1,7 @@
 import { resolve, extname, delimiter, relative, sep } from 'path'
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'fs'
 import { execSync } from 'child_process'
+import { createHash } from 'crypto'
 
 export class Make {
     constructor(projectDir) {
@@ -34,6 +35,22 @@ export class Make {
         const releaseDir = resolve(this.projectDir, 'release');
         mkdirSync(releaseDir, { recursive: true });
 
+        const staleFiles = javaFiles.filter(javaFile => {
+            const rel = relative(srcDir, javaFile);
+            const classFile = resolve(buildDir, rel.replace(/\.java$/, '.class'));
+            if (!existsSync(classFile)) return true;
+            return statSync(javaFile).mtimeMs > statSync(classFile).mtimeMs;
+        });
+
+        if (staleFiles.length === 0) {
+            console.log('[BUILD] No Java sources changed, skipping compilation');
+            return;
+        }
+
+        console.log(`[BUILD] ${staleFiles.length} of ${javaFiles.length} Java source(s) changed, recompiling...`);
+
+        const classHashesBefore = collectClassHashes(buildDir);
+
         const quote = (value) => `'${value.replace(/'/g, "'\\''")}'`;
         const command = [
             'java',
@@ -44,9 +61,17 @@ export class Make {
             quote(buildDir),
             ...javaFiles.map(quote)
         ].join(' ');
-
-        console.log(`[BUILD] Compiling ${javaFiles.length} Java file(s) with Janino...`);
         execSync(command, { cwd: this.projectDir, stdio: 'inherit' });
+
+        const classHashesAfter = collectClassHashes(buildDir);
+
+        const changedClasses = new Set();
+        for (const [rel, hashAfter] of classHashesAfter) {
+            const hashBefore = classHashesBefore.get(rel);
+            if (hashBefore === undefined || hashBefore !== hashAfter) {
+                changedClasses.add(rel);
+            }
+        }
 
         const classFiles = collectFiles(buildDir, '.class').map((file) => relative(buildDir, file));
         if (classFiles.length === 0) {
@@ -65,6 +90,13 @@ export class Make {
         }
 
         for (const [packageName, files] of packages) {
+            const jarName = `${packageName.toUpperCase()}.JAR`;
+            const jarPath = resolve(releaseDir, jarName);
+            const hasChanged = files.some(file => changedClasses.has(file));
+            if (!hasChanged && existsSync(jarPath)) {
+                console.log(`[BUILD] ${jarName} up to date`);
+                continue;
+            }
             await this.createPackageJar(buildDir, releaseDir, packageName, files);
         }
     }
@@ -108,3 +140,18 @@ export class Make {
 
 const make = new Make(process.cwd());
 await make.compileJavaSources();
+
+function collectClassHashes(buildDir) {
+    const hashes = new Map();
+    const collectFiles = (directory) =>
+        readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+            const file = resolve(directory, entry.name);
+            if (entry.isDirectory()) return collectFiles(file);
+            return entry.isFile() && entry.name.toLowerCase().endsWith('.class') ? [file] : [];
+        });
+    for (const file of collectFiles(buildDir)) {
+        const rel = relative(buildDir, file);
+        hashes.set(rel, createHash('sha256').update(readFileSync(file)).digest('hex'));
+    }
+    return hashes;
+}
