@@ -69,14 +69,25 @@ public class Graphics {
         if (handle < 0) {
             return false;
         }
-        byte[] row = new byte[width];
         int base = 0xa0000 + y * screenWidth;
-        for (int r = 0; r < height; r++) {
-            Native.readBytes(base + r * screenWidth, row, screenWidth, width, x);
-            if (!File.write(handle, row)) {
+        int blockSize = 3200;
+        int rowsPerBlock = blockSize / width;
+        if (rowsPerBlock < 1) {
+            rowsPerBlock = 1;
+        }
+        int remaining = height;
+        int row = 0;
+        while (remaining > 0) {
+            int rowsThis = remaining < rowsPerBlock ? remaining : rowsPerBlock;
+            int count = rowsThis * width;
+            byte[] data = new byte[count];
+            Native.readBytes(base + row * screenWidth, data, screenWidth, width, x);
+            if (!File.write(handle, data)) {
                 File.close(handle);
                 return false;
             }
+            remaining -= rowsThis;
+            row += rowsThis;
         }
         File.close(handle);
         return true;
@@ -88,13 +99,24 @@ public class Graphics {
             return false;
         }
         int base = 0xa0000 + y * screenWidth;
-        for (int r = 0; r < height; r++) {
-            byte[] data = File.read(handle, width);
+        int blockSize = 3200;
+        int rowsPerBlock = blockSize / width;
+        if (rowsPerBlock < 1) {
+            rowsPerBlock = 1;
+        }
+        int remaining = height;
+        int row = 0;
+        while (remaining > 0) {
+            int rowsThis = remaining < rowsPerBlock ? remaining : rowsPerBlock;
+            int count = rowsThis * width;
+            byte[] data = File.read(handle, count);
             if (data == null) {
                 File.close(handle);
                 return false;
             }
-            Native.writeBytes(base + r * screenWidth, data, screenWidth, width, x, -1);
+            Native.writeBytes(base + row * screenWidth, data, screenWidth, width, x, -1);
+            remaining -= rowsThis;
+            row += rowsThis;
         }
         File.close(handle);
         return true;
